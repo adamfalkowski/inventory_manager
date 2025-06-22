@@ -4,14 +4,14 @@ colors:
     color_id: 3
     hsv: [0, 255, 255]
     variance: [0.1, 0.6, 0.6]
-    min_area: 500
+    min_area: 2000
   blue: 
     color_id: 2
     hsv: [120, 255, 255]
-    variance: [0.1, 0.4, 0.7]
-    min_area: 300
+    variance: [0.2, 0.4, 0.7]
+    min_area: 2000
   green:
     color_id: 1
     hsv: [60, 255, 255]
     variance: [0.2, 0.4, 0.6]
-    min_area: 500
+    min_area: 2000

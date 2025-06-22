@@ -28,6 +28,7 @@ setup(
     entry_points={
         'console_scripts': [
             'camera_publisher = camera.camera_publisher:main',
+            'picture_publisher = camera.picture_publisher:main',
             'color_detection = camera.color_detection:main'
         ],
     },

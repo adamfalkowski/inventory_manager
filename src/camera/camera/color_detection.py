@@ -8,7 +8,9 @@ from message_interfaces.msg import ItemColor
 from models.item_color_data import ColorData
 
 
-
+# Reads from the 'raw_camera' channel
+# Performs color detection
+# Publishes on 'item/color' channel
 class ColorDetection(Node):
     def __init__(self):
         super().__init__("color_detection")
@@ -17,6 +19,8 @@ class ColorDetection(Node):
         # General params are loaded via ROS2 Parameters, Color Specific params are loaded via pyyaml    
         self.declare_parameter('num_colors', 3)
         self.declare_parameter('show_mask', False)
+        self.declare_parameter('show_raw', False)
+        self.declare_parameter('picture_or_camera', False)
 
         color_detection_colors_file_path = os.path.join(
             get_package_share_directory('camera'),
@@ -30,21 +34,26 @@ class ColorDetection(Node):
                 # Add ROS2 Parameter to dictionary
                 self.color_detection_params['num_colors'] = self.get_parameter('num_colors').value
                 self.color_detection_params['show_mask'] = self.get_parameter('show_mask').value
+                self.color_detection_params['show_raw'] = self.get_parameter('show_mask').value
+                self.color_detection_params['picture_or_camera'] = self.get_parameter('picture_or_camera').value
                 self.get_logger().info(f"color detection colors parameters successfully loaded! {self.color_detection_params}")
             except:
                 self.get_logger().error(f"Error Parsing the parameter files!")
 
-        # Subscribe to the raw image topic
-        self.subscriber = self.create_subscription(Image, 'raw_image', self.subscriber_callback, 10)
+        # Subscribe to the raw camera / picture topic
+        if self.color_detection_params.get('picture_or_camera', False):
+            self.subscriber = self.create_subscription(Image, 'raw_picture', self.subscriber_callback, 10)
+        else:
+            self.subscriber = self.create_subscription(Image, 'raw_camera', self.subscriber_callback, 10)
         self.bridge = CvBridge()
         self.retrieved_image = np.zeros((200, 300), dtype=np.uint8)
 
         # Publish the color detected
         self.publisher = self.create_publisher(ItemColor, 'item/color', 10)
-        self.publishing_frequency = 10
+        self.publishing_frequency = 30
         self.timer = self.create_timer((1 / self.publishing_frequency),self.publish_item)
 
-        # Array will hold an array for each color detected.
+        # List of ColorData DataObjects (color, count, area, etc).  All information about a detected color group. This list is then published on the 'item/color' topic
         self.color_group = []
 
         
@@ -57,6 +66,14 @@ class ColorDetection(Node):
         except Exception as e:
             self.get_logger().error(f"Issues retrieving the image: {e}")
             return
+        
+        # Option to show raw picture / image
+        if self.color_detection_params['show_raw']:
+            if self.color_detection_params['picture_or_camera']:
+                cv.namedWindow('Received Image',cv.WINDOW_NORMAL)
+                cv.resizeWindow('My Image', 1800, 1600)
+            cv.imshow('Received Image',self.retrieved_image)
+            cv.waitKey(100)
         
         # Convert to HSV
         self.hsv_retrieved_image = cv.cvtColor(self.retrieved_image, cv.COLOR_BGR2HSV)
@@ -74,23 +91,32 @@ class ColorDetection(Node):
             
             # Option to show the mask
             if self.color_detection_params['show_mask']:
+                if self.color_detection_params['picture_or_camera']:
+                    cv.namedWindow("mask",cv.WINDOW_NORMAL)
+                    cv.resizeWindow("mask", 1800, 1600)
                 cv.imshow("mask",mask)
                 cv.waitKey(100)
 
             self.contours, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
             # Contours are a python list of contours.  Each contour is a numpy array of the cordiantes of the end points of the contour (this is what chain approx simple does_)
-            item_count = len( [contour for contour in self.contours if cv.contourArea(contour) > color_params['min_area']] ) 
+            self.contours =  [contour for contour in self.contours if cv.contourArea(contour) > color_params['min_area']]
+            item_count = len(self.contours) 
 
-            for contour in self.contours:
-                if int(cv.contourArea(contour)) > color_params['min_area']:
-                    m = cv.moments(contour)
-                    cx = m["m10"] / m["m00"]
-                    cy = m["m01"] / m["m00"]
-                    #circle = cv.circle(self.retrieved_image, (cx,cy), 3, (0,255,0), -1)
-                    #cv.imshow('circle',circle)
-                    #cv.waitKey(100)
+            cx = []
+            cy = []
+            area = []
             
-            self.color_group.append(ColorData(color, item_count, cx, cy))
+            for contour in self.contours:
+                #print(cv.contourArea(contour))
+                area.append(cv.contourArea(contour))
+                m = cv.moments(contour)
+                cx.append(m["m10"] / m["m00"])
+                cy.append(m["m01"] / m["m00"])
+                #circle = cv.circle(self.retrieved_image, (cx,cy), 3, (0,255,0), -1)
+                #cv.imshow('circle',circle)
+                #cv.waitKey(100)
+            
+            self.color_group.append(ColorData(color, item_count, cx, cy, area))
 
 
     def findColor(self, color: str, color_id: int, hsv: list, variance: list) -> tuple:
@@ -157,6 +183,9 @@ class ColorDetection(Node):
             msg.cy = item.cy
             self.publisher.publish(msg)
             self.get_logger().info(f'Publishing Item on topic /item/color with frequency of {self.publishing_frequency} hertz')
+        
+        # Clear the color group after publishing.
+        self.color_group = []
 
 
 def main():

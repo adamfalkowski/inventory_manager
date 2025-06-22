@@ -4,13 +4,15 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2 as cv
 
+# Publishes live image from Webcam to the 'raw_camera' channel
 class CameraPublisher(Node):
     def __init__(self):
         super().__init__("camera_publisher")
-        self.publisher_ = self.create_publisher(Image, 'raw_image', 10)
+        self.publisher_ = self.create_publisher(Image, 'raw_camera', 10)
         self.publishing_frequency_ = 30
         self.timer_ = self.create_timer((1 / self.publishing_frequency_),self.timer_callback)
         self.camera_index = 0
+
         try:
             self.capture_ = cv.VideoCapture(self.camera_index)
             if not self.capture_.isOpened():
@@ -27,7 +29,7 @@ class CameraPublisher(Node):
             # BRG is the default for CV Images (blue, red, green), 8 bits, so a max of 2^8 = 255
             img_msg = self.bridge_.cv2_to_imgmsg(frame, encoding='bgr8')
             self.publisher_.publish(img_msg)
-            self.get_logger().info(f'Publishing Image on channel /raw_image with frequency of {self.publishing_frequency_} hertz')
+            self.get_logger().info(f'Publishing Image on channel /raw_camera with frequency of {self.publishing_frequency_} hertz')
         else:
             self.get_logger().error('Failed to grab frame!')
 
