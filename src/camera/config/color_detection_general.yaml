@@ -2,7 +2,7 @@
 color_detection:
   ros__parameters:
     num_colors: 3
-    show_mask: True
+    show_mask: False
     show_raw: False
     picture_or_camera: False
 

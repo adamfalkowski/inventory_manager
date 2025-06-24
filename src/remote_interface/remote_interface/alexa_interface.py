@@ -47,7 +47,7 @@ class LaunchRequestHandler(AbstractRequestHandler):
 
     def handle(self, handler_input):
         # type: (HandlerInput) -> Response
-        speech_text = "Hi, inventory manager activate!"
+        speech_text = "Hi, inventory manager activated!"
 
 
         handler_input.response_builder.speak(speech_text).set_card(
