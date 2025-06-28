@@ -11,7 +11,7 @@ class CameraPublisher(Node):
         self.publisher_ = self.create_publisher(Image, 'raw_camera', 10)
         self.publishing_frequency_ = 30
         self.timer_ = self.create_timer((1 / self.publishing_frequency_),self.timer_callback)
-        self.camera_index = 1
+        self.camera_index = 0
 
         try:
             self.capture_ = cv.VideoCapture(self.camera_index)
