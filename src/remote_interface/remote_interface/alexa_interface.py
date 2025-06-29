@@ -81,7 +81,7 @@ class ColorIntentHandler(AbstractRequestHandler):
                 elif data["count"] == 1:
                     parts.append(f"1 {color} item")
                 else:
-                    parts.append(f"{data["count"]} {color} items")
+                    parts.append(f"{data['count']} {color} items")
             speech_text = "I see " + ", ".join(parts) + "."
 
         
