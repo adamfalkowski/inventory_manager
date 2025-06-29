@@ -40,7 +40,10 @@ def generate_launch_description():
         #    output='screen'
         #),
         ExecuteProcess(
-            cmd=['/home/adam-falkowski/inventory_manager_ws/src/remote_interface/launch/run_remote_interface.sh'],
+            # For Laptop
+            #cmd=['/home/adam-falkowski/inventory_manager_ws/src/remote_interface/launch/run_remote_interface.sh'], 
+            # For RPI
+            cmd=['~/projects/inventory_manager/src/remote_interface/launch/run_remote_interface.sh'],
             shell=True,
             output='screen'
         )
