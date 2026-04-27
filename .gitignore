@@ -179,3 +179,4 @@ cython_debug/
 
 # Other
 log/
+yolov8n.pt
