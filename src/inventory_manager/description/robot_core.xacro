@@ -1,0 +1,171 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" >
+
+<!-- ============================================================ -->
+<!-- Materials (used for RViz display) -->
+<!-- ============================================================ -->
+<material name="chassis_grey">
+    <color rgba="0.3 0.3 0.3 1.0"/>
+</material>
+<material name="wheel_black">
+    <color rgba="0.05 0.05 0.05 1.0"/>
+</material>
+
+<!-- ============================================================ -->
+<!-- Properties:  -->
+<!-- ============================================================ -->
+<xacro:property name="chassis_length" value="0.40"/>
+<xacro:property name="chassis_width"  value="0.30"/>
+<xacro:property name="chassis_height" value="0.15"/>
+<xacro:property name="chassis_mass"   value="5.0"/>
+
+<xacro:property name="wheel_radius" value="0.05"/>
+<xacro:property name="wheel_width"  value="0.04"/>
+<xacro:property name="wheel_mass"   value="0.3"/>
+
+<xacro:property name="wheel_separation" value="0.30"/> <!-- left-right distance between wheel centers -->
+<xacro:property name="wheelbase"        value="0.30"/> <!-- front-to-back distance between axles -->
+
+<!-- ============================================================ -->
+  <!-- Reusable inertia macros -->
+  <!-- ============================================================ -->
+  <xacro:macro name="box_inertia" params="mass x y z">
+    <inertial>
+      <mass value="${mass}"/>
+      <inertia
+        ixx="${(mass/12.0)*(y*y+z*z)}" ixy="0.0" ixz="0.0"
+        iyy="${(mass/12.0)*(x*x+z*z)}" iyz="0.0"
+        izz="${(mass/12.0)*(x*x+y*y)}"/>
+    </inertial>
+  </xacro:macro>
+
+  <xacro:macro name="cylinder_inertia" params="mass r h">
+    <inertial>
+      <mass value="${mass}"/>
+      <inertia
+        ixx="${(mass/12.0)*(3*r*r+h*h)}" ixy="0.0" ixz="0.0"
+        iyy="${(mass/12.0)*(3*r*r+h*h)}" iyz="0.0"
+        izz="${(mass/2.0)*(r*r)}"/>
+    </inertial>
+  </xacro:macro>
+
+  <!-- ============================================================ -->
+  <!-- base_footprint (ground-projected origin) + base_link (chassis body) -->
+  <!-- Standard ROS2 convention: base_footprint sits at ground level, -->
+  <!-- base_link is offset up by one wheel radius.                   -->
+  <!-- ============================================================ -->
+  <link name="base_footprint"/>
+
+  <joint name="base_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+      </geometry>
+      <material name="chassis_grey"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+      </geometry>
+    </collision>
+    <xacro:box_inertia mass="${chassis_mass}" x="${chassis_length}" y="${chassis_width}" z="${chassis_height}"/>
+  </link>
+
+  <gazebo reference="base_link">
+    <material>Gazebo/Grey</material>
+  </gazebo>
+
+  <!-- ============================================================ -->
+  <!-- Wheel macro                                                   -->
+  <!-- Every wheel gets identical visual/collision/inertial/joint    -->
+  <!-- structure. Whether a wheel is actually "driven" is decided    -->
+  <!-- ONLY by whether its joint name is referenced by the Gazebo    -->
+  <!-- diff_drive plugin below - rear wheels get a normal continuous-->
+  <!-- joint with no plugin attached, so they spin freely under      -->
+  <!-- rolling friction as the robot moves, exactly like an unpowered-->
+  <!-- axle.                                                          -->
+  <!-- ============================================================ -->
+  <xacro:macro name="wheel" params="prefix x_pos y_pos">
+    <link name="${prefix}_wheel_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <material name="wheel_black"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </collision>
+      <xacro:cylinder_inertia mass="${wheel_mass}" r="${wheel_radius}" h="${wheel_width}"/>
+    </link>
+
+    <joint name="${prefix}_wheel_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${prefix}_wheel_link"/>
+      <origin xyz="${x_pos} ${y_pos} -${wheel_radius}" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <dynamics damping="0.1" friction="0.0"/>
+    </joint>
+
+    <gazebo reference="${prefix}_wheel_link">
+      <material>Gazebo/Black</material>
+      <mu1>1.0</mu1>
+      <mu2>1.0</mu2>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- FRONT wheels: these are the ones the diff_drive plugin actuates -->
+  <xacro:wheel prefix="front_left"  x_pos="${wheelbase/2}"  y_pos="${wheel_separation/2}"/>
+  <xacro:wheel prefix="front_right" x_pos="${wheelbase/2}"  y_pos="-${wheel_separation/2}"/>
+
+  <!-- REAR wheels: identical joint type, but never referenced by the -->
+  <!-- plugin below, so nothing ever commands them - they roll freely -->
+  <xacro:wheel prefix="rear_left"  x_pos="-${wheelbase/2}"  y_pos="${wheel_separation/2}"/>
+  <xacro:wheel prefix="rear_right" x_pos="-${wheelbase/2}"  y_pos="-${wheel_separation/2}"/>
+
+  <!-- ============================================================ -->
+  <!-- Gazebo differential drive plugin                              -->
+  <!-- Only the FRONT wheel joints are given here, so only the front -->
+  <!-- wheels receive commands / apply torque. Rear wheels are never -->
+  <!-- mentioned by any plugin, so Gazebo just lets them spin freely.-->
+  <!-- ============================================================ -->
+  <gazebo>
+    <plugin name="diff_drive_controller" filename="libgazebo_ros_diff_drive.so">
+      <ros>
+        <namespace>/</namespace>
+      </ros>
+
+      <left_joint>front_left_wheel_joint</left_joint>
+      <right_joint>front_right_wheel_joint</right_joint>
+
+      <wheel_separation>${wheel_separation}</wheel_separation>
+      <wheel_diameter>${wheel_radius*2}</wheel_diameter>
+
+      <max_wheel_torque>20</max_wheel_torque>
+      <max_wheel_acceleration>1.0</max_wheel_acceleration>
+
+      <command_topic>cmd_vel</command_topic>
+
+      <odometry_topic>odom</odometry_topic>
+      <odometry_frame>odom</odometry_frame>
+      <robot_base_frame>base_footprint</robot_base_frame>
+
+      <publish_odom>true</publish_odom>
+      <publish_odom_tf>true</publish_odom_tf>
+      <publish_wheel_tf>true</publish_wheel_tf>
+    </plugin>
+  </gazebo>
+
+</robot>
