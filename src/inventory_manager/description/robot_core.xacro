@@ -7,8 +7,11 @@
 <material name="chassis_grey">
     <color rgba="0.3 0.3 0.3 1.0"/>
 </material>
-<material name="wheel_black">
-    <color rgba="0.05 0.05 0.05 1.0"/>
+<material name="wheel_orange">
+    <color rgba="0.9 0.6 0.1 1.0"/>
+</material>
+<material name="caster_silver">
+    <color rgba="0.8 0.8 0.8 1.0"/>
 </material>
 
 <!-- ============================================================ -->
@@ -25,6 +28,9 @@
 
 <xacro:property name="wheel_separation" value="0.30"/> <!-- left-right distance between wheel centers -->
 <xacro:property name="wheelbase"        value="0.30"/> <!-- front-to-back distance between axles -->
+
+<xacro:property name="caster_radius" value="0.025"/>
+<xacro:property name="caster_mass"   value="0.1"/>
 
 <!-- ============================================================ -->
   <!-- Reusable inertia macros -->
@@ -46,6 +52,17 @@
         ixx="${(mass/12.0)*(3*r*r+h*h)}" ixy="0.0" ixz="0.0"
         iyy="${(mass/12.0)*(3*r*r+h*h)}" iyz="0.0"
         izz="${(mass/2.0)*(r*r)}"/>
+    </inertial>
+  </xacro:macro>
+
+  <!-- Solid sphere inertia: I = (2/5) * m * r^2 for all three axes -->
+  <xacro:macro name="sphere_inertia" params="mass r">
+    <inertial>
+      <mass value="${mass}"/>
+      <inertia
+        ixx="${(2.0/5.0)*mass*r*r}" ixy="0.0" ixz="0.0"
+        iyy="${(2.0/5.0)*mass*r*r}" iyz="0.0"
+        izz="${(2.0/5.0)*mass*r*r}"/>
     </inertial>
   </xacro:macro>
 
@@ -100,7 +117,7 @@
         <geometry>
           <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
         </geometry>
-        <material name="wheel_black"/>
+        <material name="wheel_orange"/>
       </visual>
       <collision>
         <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
@@ -132,40 +149,73 @@
 
   <!-- REAR wheels: identical joint type, but never referenced by the -->
   <!-- plugin below, so nothing ever commands them - they roll freely -->
-  <xacro:wheel prefix="rear_left"  x_pos="-${wheelbase/2}"  y_pos="${wheel_separation/2}"/>
-  <xacro:wheel prefix="rear_right" x_pos="-${wheelbase/2}"  y_pos="-${wheel_separation/2}"/>
+  <!-- <xacro:wheel prefix="rear_left"  x_pos="-${wheelbase/2}"  y_pos="${wheel_separation/2}"/>
+  <xacro:wheel prefix="rear_right" x_pos="-${wheelbase/2}"  y_pos="-${wheel_separation/2}"/> -->
+
+  <!-- ============================================================ -->
+  <!-- Rear caster macro                                             -->
+  <!-- A caster is modeled as a simple sphere with very low friction -->
+  <!-- and a FIXED joint (no motor, no rotation axis needed) a    -->
+  <!-- sphere's shape lets it slide/scrub in any direction under low -->
+  <!-- friction, which is what a real swivel caster does, without    -->
+  <!-- needing to model the actual swivel mechanism.                 -->
+  <!-- ============================================================ -->
+  <xacro:macro name="caster" params="prefix x_pos y_pos">
+    <link name="${prefix}_caster_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <sphere radius="${caster_radius}"/>
+        </geometry>
+        <material name="caster_silver"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <sphere radius="${caster_radius}"/>
+        </geometry>
+      </collision>
+      <xacro:sphere_inertia mass="${caster_mass}" r="${caster_radius}"/>
+    </link>
+
+    <joint name="${prefix}_caster_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="${prefix}_caster_link"/>
+      <origin xyz="${x_pos} ${y_pos} ${-(wheel_radius+caster_radius)}" rpy="0 0 0"/>
+    </joint>
+
+    <gazebo reference="${prefix}_caster_link">
+      <material>Gazebo/Grey</material>
+      <mu1>0.01</mu1>
+      <mu2>0.01</mu2>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- Rear casters: replace the old rear_left/rear_right wheels -->
+  <xacro:caster prefix="rear_left"  x_pos="-${wheelbase/2}" y_pos="${wheel_separation/2}"/>
+  <xacro:caster prefix="rear_right" x_pos="-${wheelbase/2}" y_pos="-${wheel_separation/2}"/>
+
 
   <!-- ============================================================ -->
   <!-- Gazebo differential drive plugin                              -->
-  <!-- Only the FRONT wheel joints are given here, so only the front -->
-  <!-- wheels receive commands / apply torque. Rear wheels are never -->
-  <!-- mentioned by any plugin, so Gazebo just lets them spin freely.-->
   <!-- ============================================================ -->
   <gazebo>
-    <plugin name="diff_drive_controller" filename="libgazebo_ros_diff_drive.so">
-      <ros>
-        <namespace>/</namespace>
-      </ros>
+    <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
+    <left_joint>front_left_wheel_joint</left_joint>
+    <right_joint>front_right_wheel_joint</right_joint>
+    <wheel_separation>${wheel_separation}</wheel_separation>
+    <wheel_radius>${wheel_radius}</wheel_radius>
+    <odom_publish_frequency>30</odom_publish_frequency>
+    <topic>cmd_vel</topic>
+    <odom_topic>odom</odom_topic>
+    <frame_id>odom</frame_id>
+    <child_frame_id>base_footprint</child_frame_id>
+  </plugin>
 
-      <left_joint>front_left_wheel_joint</left_joint>
-      <right_joint>front_right_wheel_joint</right_joint>
-
-      <wheel_separation>${wheel_separation}</wheel_separation>
-      <wheel_diameter>${wheel_radius*2}</wheel_diameter>
-
-      <max_wheel_torque>20</max_wheel_torque>
-      <max_wheel_acceleration>1.0</max_wheel_acceleration>
-
-      <command_topic>cmd_vel</command_topic>
-
-      <odometry_topic>odom</odometry_topic>
-      <odometry_frame>odom</odometry_frame>
-      <robot_base_frame>base_footprint</robot_base_frame>
-
-      <publish_odom>true</publish_odom>
-      <publish_odom_tf>true</publish_odom_tf>
-      <publish_wheel_tf>true</publish_wheel_tf>
-    </plugin>
+  <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
+    <joint_name>front_left_wheel_joint</joint_name>
+    <joint_name>front_right_wheel_joint</joint_name>
+  </plugin>
   </gazebo>
 
 </robot>
