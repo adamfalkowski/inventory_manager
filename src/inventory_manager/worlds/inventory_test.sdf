@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <world name="inventory_test_world">
+
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>20 20</size></plane></geometry>
+        </visual>
+      </link>
+    </model>
+
+    <!-- A few simple box obstacles for the lidar to detect -->
+    <model name="wall_1">
+      <static>true</static>
+      <pose>2 0 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.2 3 1</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.2 3 1</size></box></geometry>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_2">
+      <static>true</static>
+      <pose>0 2 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>3 0.2 1</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>3 0.2 1</size></box></geometry>
+        </visual>
+      </link>
+    </model>
+
+    <model name="box_obstacle">
+      <static>true</static>
+      <pose>1 -1 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.5 0.5 0.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.5 0.5 0.5</size></box></geometry>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>

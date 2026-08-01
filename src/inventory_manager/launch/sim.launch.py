@@ -41,13 +41,17 @@ def generate_launch_description():
         output='screen'
     ) 
 
+    world_path = os.path.join(pkg_path, 'worlds', 'inventory_test.sdf')
+
     # Launch file for gazebo since it includes many different nodes and configurations
     gazebo = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(
-                get_package_share_directory('ros_gz_sim'),'launch','gz_sim.launch.py')
-        ),
-    launch_arguments={'gz_args': '-r empty.sdf'}.items()
+    PythonLaunchDescriptionSource(
+        os.path.join(
+            get_package_share_directory('ros_gz_sim'),
+            'launch', 'gz_sim.launch.py'
+        )
+    ),
+    launch_arguments={'gz_args': f'-r {world_path}'}.items()
     )
 
     node_spawn_entity = Node(
@@ -65,11 +69,12 @@ def generate_launch_description():
             # <topic_name>@<ros2_type>@<gz_type>
             '/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist',
             '/odom@nav_msgs/msg/Odometry@gz.msgs.Odometry',
-            '/world/empty/model/inventory_robot/joint_state@sensor_msgs/msg/JointState[gz.msgs.Model',
+            '/world/inventory_test_world/model/inventory_robot/joint_state@sensor_msgs/msg/JointState[gz.msgs.Model',
             '/model/inventory_robot/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V',
+            '/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
         ],
         remappings=[
-        ('/world/empty/model/inventory_robot/joint_state', '/joint_states'),
+        ('/world/inventory_test_world/model/inventory_robot/joint_state', '/joint_states'),
         ('/model/inventory_robot/tf', '/tf'),
         ],
         output='screen'
